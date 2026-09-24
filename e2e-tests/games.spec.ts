@@ -24,6 +24,51 @@ test.describe('Game Listing and Navigation', () => {
     });
   });
 
+  test.describe('Game Filtering', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+      await expect(page.getByTestId('game-filters')).toBeVisible();
+      await expect(page.getByTestId('games-grid')).toBeVisible();
+    });
+
+    test('filters by multiple categories and preserves selections in the URL', async ({ page }) => {
+      const categories = page.locator('input[name="category"]');
+      const initialCount = await page.getByTestId('game-card').count();
+      await categories.nth(0).check();
+      await categories.nth(1).check();
+      await page.getByTestId('apply-filters').click();
+
+      await expect(page).toHaveURL(/[?&]category=[^&]+.*[?&]category=[^&]+/);
+      await expect(page.getByTestId('filter-results')).toContainText('games shown');
+      expect(await page.locator('[data-testid="filterable-game"]:not([hidden])').count()).toBeLessThanOrEqual(initialCount);
+    });
+
+    test('combines category and publisher filters', async ({ page }) => {
+      await page.locator('input[name="category"]').first().check();
+      await page.getByTestId('publisher-filter').selectOption({ index: 1 });
+      await page.getByTestId('apply-filters').click();
+
+      await expect(page).toHaveURL(/[?&]category=[^&]+/);
+      await expect(page).toHaveURL(/[?&]publisher=[^&]+/);
+      await expect(page.getByTestId('filter-results')).toContainText('game');
+      expect(await page.locator('[data-testid="filterable-game"]:not([hidden])').count()).toBeGreaterThan(0);
+      expect(await page.locator('[data-testid="filterable-game"]:not([hidden])').count()).toBeLessThan(
+        await page.getByTestId('filterable-game').count(),
+      );
+    });
+
+    test('resets filters and shows the full catalog', async ({ page }) => {
+      const initialCount = await page.getByTestId('game-card').count();
+      await page.locator('input[name="category"]').first().check();
+      await page.getByTestId('apply-filters').click();
+      await page.getByTestId('reset-filters').click();
+
+      await expect(page).toHaveURL('/');
+      await expect(page.getByTestId('filter-results')).toContainText(`${initialCount} games shown`);
+      await expect(page.locator('[data-testid="filterable-game"]:not([hidden])')).toHaveCount(initialCount);
+    });
+  });
+
   test('should navigate to correct game details page when clicking on a game', async ({ page }) => {
     let gameId: string | null;
     let gameTitle: string | null;
